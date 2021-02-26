@@ -36,7 +36,7 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="ticker"
-                v-on:keyup.enter="add"
+                v-on:keyup.enter="getApiTickers"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -211,7 +211,6 @@ export default {
         if (this.sel !== null && this.sel.name === currentTicker.name) {
           this.graph.push(data.USD);
         }
-        console.log(this.tickers.get);
       }, 6000);
 
       this.ticker = "";
@@ -239,6 +238,21 @@ export default {
       return this.graph.map(
         price => 4 + ((price - minValue) * 96) / (maxValue - minValue)
       );
+    },
+    async getApiTickers() {
+      const f = await fetch(
+        "https://min-api.cryptocompare.com/data/all/coinlist?summary=true"
+      );
+      let data = await f.json();
+      data = data.Data;
+      for (const key in data) {
+        if (Object.hasOwnProperty.call(data, key)) {
+          const element = data[key];
+          if (element.Symbol === "BTC") {
+            console.log(element);
+          }
+        }
+      }
     }
   }
 };

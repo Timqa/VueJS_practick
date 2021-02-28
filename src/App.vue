@@ -36,7 +36,8 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="ticker"
-                v-on:keyup.enter="getApiTickers"
+                v-on:keyup="getSymbolsTickers"
+                v-on:keyup.enter="add"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -189,8 +190,15 @@ export default {
       tickers: [],
       sel: null,
       graph: [],
-      spinner: false
+      spinner: false,
+      apiTickers: null,
+      arrTickersSybmols: []
     };
+  },
+  created: function() {
+    fetch("https://min-api.cryptocompare.com/data/all/coinlist?summary=true")
+      .then(data => data.json())
+      .then(data => (this.apiTickers = data.Data));
   },
   methods: {
     add() {
@@ -239,20 +247,25 @@ export default {
         price => 4 + ((price - minValue) * 96) / (maxValue - minValue)
       );
     },
-    async getApiTickers() {
-      const f = await fetch(
-        "https://min-api.cryptocompare.com/data/all/coinlist?summary=true"
-      );
-      let data = await f.json();
-      data = data.Data;
-      for (const key in data) {
-        if (Object.hasOwnProperty.call(data, key)) {
-          const element = data[key];
-          if (element.Symbol === "BTC") {
-            console.log(element);
-          }
+
+    getSymbolsTickers() {
+      let num = 0;
+      const arrTickersName = [];
+      const newArrTickersName = [];
+      const obj = this.apiTickers;
+      for (const key in obj) {
+        if (Object.hasOwnProperty.call(obj, key)) {
+          arrTickersName.push(obj[key].Symbol);
         }
       }
+      for (const nameTicker of arrTickersName) {
+        if (nameTicker.startsWith(this.ticker.toUpperCase()) && num <= 3) {
+          newArrTickersName.push(nameTicker);
+          num++;
+        }
+      }
+      [...this.arrTickersSybmols] = newArrTickersName;
+      console.log(this.arrTickersSybmols);
     }
   }
 };

@@ -37,6 +37,7 @@
               <input
                 v-model="ticker"
                 v-on:keyup="getSymbolsTickers"
+                @click="editInput"
                 v-on:keyup.enter="add"
                 type="text"
                 name="wallet"
@@ -46,30 +47,21 @@
               />
             </div>
             <div
+              v-if="arrTickersSybmols.length"
               class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
             >
               <span
+                v-for="symbol in arrTickersSybmols"
+                @click="selectSymbolTicker(symbol)"
+                :key="symbol"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
-                BTC
+                {{ symbol }}
               </span>
-              <!-- <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                CHD
-              </span> -->
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="activeTickersName" class="text-sm text-red-600">
+              Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
@@ -77,7 +69,6 @@
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
-          <!-- Heroicon name: solid/mail -->
           <svg
             class="-ml-0.5 mr-2 h-6 w-7"
             xmlns="http://www.w3.org/2000/svg"
@@ -169,7 +160,7 @@
           >
             <g>
               <path
-                d="M436.896,74.869c-99.84-99.819-262.208-99.819-362.048,0c-99.797,99.819-99.797,262.229,0,362.048    c49.92,49.899,115.477,74.837,181.035,74.837s131.093-24.939,181.013-74.837C536.715,337.099,536.715,174.688,436.896,74.869z     M361.461,331.317c8.341,8.341,8.341,21.824,0,30.165c-4.16,4.16-9.621,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251    l-75.413-75.435l-75.392,75.413c-4.181,4.16-9.643,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251    c-8.341-8.341-8.341-21.845,0-30.165l75.392-75.413l-75.413-75.413c-8.341-8.341-8.341-21.845,0-30.165    c8.32-8.341,21.824-8.341,30.165,0l75.413,75.413l75.413-75.413c8.341-8.341,21.824-8.341,30.165,0    c8.341,8.32,8.341,21.824,0,30.165l-75.413,75.413L361.461,331.317z"
+                d="M436.896,74.869c-99.84-99.819-262.208-99.819-362.048,0c-99.797,99.819-99.797,262.229,0,362.048 c49.92,49.899,115.477,74.837,181.035,74.837s131.093-24.939,181.013-74.837C536.715,337.099,536.715,174.688,436.896,74.869z M361.461,331.317c8.341,8.341,8.341,21.824,0,30.165c-4.16,4.16-9.621,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251 l-75.413-75.435l-75.392,75.413c-4.181,4.16-9.643,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251 c-8.341-8.341-8.341-21.845,0-30.165l75.392-75.413l-75.413-75.413c-8.341-8.341-8.341-21.845,0-30.165 c8.32-8.341,21.824-8.341,30.165,0l75.413,75.413l75.413-75.413c8.341-8.341,21.824-8.341,30.165,0 c8.341,8.32,8.341,21.824,0,30.165l-75.413,75.413L361.461,331.317z"
                 fill="#718096"
                 data-original="#000000"
               ></path>
@@ -191,6 +182,8 @@ export default {
       sel: null,
       graph: [],
       spinner: false,
+      activeTickersName: false,
+      editInp: true,
       apiTickers: null,
       arrTickersSybmols: []
     };
@@ -202,26 +195,27 @@ export default {
   },
   methods: {
     add() {
-      const currentTicker = {
-        name: this.ticker,
-        price: "-"
-      };
+      if (this.checkTickers()) {
+        const currentTicker = {
+          name: this.ticker,
+          price: "-"
+        };
+        this.tickers.push(currentTicker);
+        setInterval(async () => {
+          const f = await fetch(
+            `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=ca894ecc82063af8c09bc50849630f609a5502a85fe2bd4784dbf117c444b95e`
+          );
+          const data = await f.json();
+          this.tickers.find(t => t.name === currentTicker.name).price =
+            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
 
-      this.tickers.push(currentTicker);
-      setInterval(async () => {
-        const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=ca894ecc82063af8c09bc50849630f609a5502a85fe2bd4784dbf117c444b95e`
-        );
-        const data = await f.json();
-        this.tickers.find(t => t.name === currentTicker.name).price =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-
-        if (this.sel !== null && this.sel.name === currentTicker.name) {
-          this.graph.push(data.USD);
-        }
-      }, 6000);
-
-      this.ticker = "";
+          if (this.sel !== null && this.sel.name === currentTicker.name) {
+            this.graph.push(data.USD);
+          }
+        }, 6000);
+        this.ticker = "";
+        [...this.arrTickersSybmols] = [];
+      }
     },
 
     removeTicker(tickerToRemove) {
@@ -229,10 +223,12 @@ export default {
         this.sel = null;
       }
       this.tickers = this.tickers.filter(ticker => ticker !== tickerToRemove);
+      console.log("removeTicker");
     },
 
     removeToSel() {
       this.sel = null;
+      console.log("removeToSel");
     },
 
     selectTicker(ticker) {
@@ -249,6 +245,7 @@ export default {
     },
 
     getSymbolsTickers() {
+      this.editInput();
       let num = 0;
       const arrTickersName = [];
       const newArrTickersName = [];
@@ -258,14 +255,37 @@ export default {
           arrTickersName.push(obj[key].Symbol);
         }
       }
-      for (const nameTicker of arrTickersName) {
-        if (nameTicker.startsWith(this.ticker.toUpperCase()) && num <= 3) {
-          newArrTickersName.push(nameTicker);
-          num++;
+      if (this.ticker) {
+        for (const nameTicker of arrTickersName) {
+          if (nameTicker.startsWith(this.ticker.toUpperCase()) && num <= 3) {
+            newArrTickersName.push(nameTicker);
+            num++;
+          }
         }
+        [...this.arrTickersSybmols] = newArrTickersName;
+      } else {
+        [...this.arrTickersSybmols] = [];
       }
-      [...this.arrTickersSybmols] = newArrTickersName;
-      console.log(this.arrTickersSybmols);
+    },
+    selectSymbolTicker(symbol) {
+      this.ticker = symbol;
+      this.add();
+    },
+    checkTickers() {
+      if (
+        this.tickers.length &&
+        this.tickers.find(el => el.name === this.ticker.toUpperCase()) !==
+          undefined
+      ) {
+        this.activeTickersName = true;
+        return false;
+      } else {
+        this.activeTickersName = false;
+        return true;
+      }
+    },
+    editInput() {
+      this.activeTickersName = false;
     }
   }
 };

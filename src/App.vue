@@ -37,7 +37,6 @@
               <input
                 v-model="ticker"
                 v-on:keyup="getSymbolsTickers"
-                @click="editInput"
                 v-on:keyup.enter="add"
                 type="text"
                 name="wallet"
@@ -188,31 +187,51 @@ export default {
       arrTickersSybmols: []
     };
   },
-  created: function() {
+  created() {
+    const tickersData = localStorage.getItem("cryptonomikon-list");
+
+    if (tickersData) {
+      this.tickers = JSON.parse(tickersData);
+      this.tickers.forEach(ticker => {
+        this.subscribeToUpdates(ticker.name);
+      });
+    }
+
     fetch("https://min-api.cryptocompare.com/data/all/coinlist?summary=true")
       .then(data => data.json())
       .then(data => (this.apiTickers = data.Data));
   },
   methods: {
+    subscribeToUpdates(tickerName) {
+      setInterval(async () => {
+        const f = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=ca894ecc82063af8c09bc50849630f609a5502a85fe2bd4784dbf117c444b95e`
+        );
+        const data = await f.json();
+        this.tickers.find(t => t.name === tickerName).price =
+          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+
+        if (this.sel !== null && this.sel.name === tickerName) {
+          this.graph.push(data.USD);
+        }
+      }, 6000);
+    },
+
     add() {
       if (this.checkTickers()) {
         const currentTicker = {
           name: this.ticker,
           price: "-"
         };
-        this.tickers.push(currentTicker);
-        setInterval(async () => {
-          const f = await fetch(
-            `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=ca894ecc82063af8c09bc50849630f609a5502a85fe2bd4784dbf117c444b95e`
-          );
-          const data = await f.json();
-          this.tickers.find(t => t.name === currentTicker.name).price =
-            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
 
-          if (this.sel !== null && this.sel.name === currentTicker.name) {
-            this.graph.push(data.USD);
-          }
-        }, 6000);
+        this.tickers.push(currentTicker);
+
+        localStorage.setItem(
+          "cryptonomikon-list",
+          JSON.stringify(this.tickers)
+        );
+        this.subscribeToUpdates(currentTicker.name);
+
         this.ticker = "";
         [...this.arrTickersSybmols] = [];
       }
@@ -223,6 +242,7 @@ export default {
         this.sel = null;
       }
       this.tickers = this.tickers.filter(ticker => ticker !== tickerToRemove);
+      localStorage.removeItem(tickerToRemove);
       console.log("removeTicker");
     },
 

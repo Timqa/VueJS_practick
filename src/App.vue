@@ -89,9 +89,32 @@
           v-if="tickers.length"
           class="w-full border-t border-gray-600 my-4"
         />
+        <div>
+          <button
+            v-if="page > 1"
+            @click="page = page - 1"
+            class=" m-1 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Назад
+          </button>
+          <button
+            v-if="hasNextPage"
+            @click="page = page + 1"
+            class="m-1 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Вперед
+          </button>
+          <div class="my-2">
+            Фильтр:<input v-model="filter" class="rounded-lg mx-1 p-1" />
+          </div>
+        </div>
+        <hr
+          v-if="tickers.length"
+          class="w-full border-t border-gray-600 my-4"
+        />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="tick in tickers"
+            v-for="tick in filteredTickers()"
             :key="tick"
             @click="selectTicker(tick)"
             :class="{
@@ -184,10 +207,24 @@ export default {
       activeTickersName: false,
       editInp: true,
       apiTickers: null,
-      arrTickersSybmols: []
+      arrTickersSybmols: [],
+      page: 1,
+      filter: "",
+      hasNextPage: true
     };
   },
   created() {
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    );
+    if (windowData.filter) {
+      this.filter = windowData.filter;
+    }
+
+    if (windowData.page) {
+      this.page = windowData.page;
+    }
+
     const tickersData = localStorage.getItem("cryptonomikon-list");
 
     if (tickersData) {
@@ -202,6 +239,18 @@ export default {
       .then(data => (this.apiTickers = data.Data));
   },
   methods: {
+    filteredTickers() {
+      const start = (this.page - 1) * 6;
+      const end = this.page * 6;
+      const filteredTickers = this.tickers.filter(ticker =>
+        ticker.name.includes(this.filter.toUpperCase())
+      );
+
+      this.hasNextPage = filteredTickers.length > end;
+
+      return filteredTickers.slice(start, end);
+    },
+
     subscribeToUpdates(tickerName) {
       setInterval(async () => {
         const f = await fetch(
@@ -233,6 +282,7 @@ export default {
         this.subscribeToUpdates(currentTicker.name);
 
         this.ticker = "";
+        this.filter = "";
         [...this.arrTickersSybmols] = [];
       }
     },
@@ -306,6 +356,24 @@ export default {
     },
     editInput() {
       this.activeTickersName = false;
+    }
+  },
+  watch: {
+    filter() {
+      this.page = 1;
+
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
+    },
+    page() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
     }
   }
 };

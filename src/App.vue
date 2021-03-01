@@ -114,11 +114,11 @@
         />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="tick in filteredTickers()"
+            v-for="tick in paginatedTickers"
             :key="tick"
             @click="selectTicker(tick)"
             :class="{
-              'border-4': sel === tick
+              'border-4': selectedTicker === tick
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
@@ -153,13 +153,13 @@
         </dl>
       </template>
       <hr class="w-full border-t border-gray-600 my-4" />
-      <section v-if="sel" class="relative">
+      <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          {{ sel.name }} - USD
+          {{ selectedTicker.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, idx) in normalizeGraph()"
+            v-for="(bar, idx) in normalizedGraph"
             :key="idx"
             :style="{ height: `${bar}%` }"
             class="bg-purple-800 border w-10"
@@ -167,7 +167,7 @@
         </div>
         <button type="button" class="absolute top-0 right-0">
           <svg
-            @click="removeToSel"
+            @click="removeToSelectedTicker"
             xmlns="http://www.w3.org/2000/svg"
             xmlns:xlink="http://www.w3.org/1999/xlink"
             xmlns:svgjs="http://svgjs.com/svgjs"
@@ -201,18 +201,18 @@ export default {
     return {
       ticker: null,
       tickers: [],
-      sel: null,
-      graph: [],
+      filter: "",
+      page: 1,
       spinner: false,
       activeTickersName: false,
       editInp: true,
-      apiTickers: null,
+      selectedTicker: null,
+      apiTickers: [],
       arrTickersSybmols: [],
-      page: 1,
-      filter: "",
-      hasNextPage: true
+      graph: []
     };
   },
+
   created() {
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
@@ -222,7 +222,7 @@ export default {
     }
 
     if (windowData.page) {
-      this.page = windowData.page;
+      this.page = Number(windowData.page);
     }
 
     const tickersData = localStorage.getItem("cryptonomikon-list");
@@ -238,19 +238,50 @@ export default {
       .then(data => data.json())
       .then(data => (this.apiTickers = data.Data));
   },
-  methods: {
-    filteredTickers() {
-      const start = (this.page - 1) * 6;
-      const end = this.page * 6;
-      const filteredTickers = this.tickers.filter(ticker =>
-        ticker.name.includes(this.filter.toUpperCase())
-      );
 
-      this.hasNextPage = filteredTickers.length > end;
-
-      return filteredTickers.slice(start, end);
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 6;
     },
 
+    endIndex() {
+      return this.page * 6;
+    },
+
+    filteredTickers() {
+      return this.tickers.filter(ticker =>
+        ticker.name.includes(this.filter.toUpperCase())
+      );
+    },
+
+    paginatedTickers() {
+      return this.filteredTickers.slice(this.startIndex, this.endIndex);
+    },
+
+    hasNextPage() {
+      return this.filteredTickers.length > this.endIndex;
+    },
+
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+      if (maxValue === minValue) {
+        return this.graph.map(() => 50);
+      }
+      return this.graph.map(
+        price => 4 + ((price - minValue) * 96) / (maxValue - minValue)
+      );
+    },
+
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page
+      };
+    }
+  },
+
+  methods: {
     subscribeToUpdates(tickerName) {
       setInterval(async () => {
         const f = await fetch(
@@ -260,7 +291,10 @@ export default {
         this.tickers.find(t => t.name === tickerName).price =
           data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
 
-        if (this.sel !== null && this.sel.name === tickerName) {
+        if (
+          this.selectedTicker !== null &&
+          this.selectedTicker.name === tickerName
+        ) {
           this.graph.push(data.USD);
         }
       }, 6000);
@@ -273,8 +307,8 @@ export default {
           price: "-"
         };
 
-        this.tickers.push(currentTicker);
-
+        this.tickers = [...this.tickers, currentTicker];
+        console.log(this.tickers);
         localStorage.setItem(
           "cryptonomikon-list",
           JSON.stringify(this.tickers)
@@ -288,59 +322,52 @@ export default {
     },
 
     removeTicker(tickerToRemove) {
-      if (tickerToRemove === this.sel) {
-        this.sel = null;
-      }
       this.tickers = this.tickers.filter(ticker => ticker !== tickerToRemove);
-      localStorage.removeItem(tickerToRemove);
+      if (tickerToRemove === this.selectedTicker) {
+        this.selectedTicker = null;
+      }
       console.log("removeTicker");
     },
 
-    removeToSel() {
-      this.sel = null;
-      console.log("removeToSel");
+    removeToSelectedTicker() {
+      this.selectedTicker = null;
+      console.log("removeToSelectedTicker");
     },
 
     selectTicker(ticker) {
-      this.sel = ticker;
-      this.graph = [];
-    },
-
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-      return this.graph.map(
-        price => 4 + ((price - minValue) * 96) / (maxValue - minValue)
-      );
+      // if (this.selectedTicker !== ticker) {
+      this.selectedTicker = ticker;
+      // }
     },
 
     getSymbolsTickers() {
       this.editInput();
       let num = 0;
       const arrTickersName = [];
-      const newArrTickersName = [];
-      const obj = this.apiTickers;
-      for (const key in obj) {
-        if (Object.hasOwnProperty.call(obj, key)) {
-          arrTickersName.push(obj[key].Symbol);
-        }
-      }
-      if (this.ticker) {
-        for (const nameTicker of arrTickersName) {
-          if (nameTicker.startsWith(this.ticker.toUpperCase()) && num <= 3) {
-            newArrTickersName.push(nameTicker);
-            num++;
+      const tickersName = this.apiTickers;
+      for (const key in tickersName) {
+        if (Object.hasOwnProperty.call(tickersName, key)) {
+          if (this.ticker) {
+            if (tickersName[key].Symbol.startsWith(this.ticker.toUpperCase())) {
+              arrTickersName.push(tickersName[key].Symbol);
+              if (num >= 3) {
+                [...this.arrTickersSybmols] = arrTickersName;
+                break;
+              }
+              num++;
+            } else {
+              [...this.arrTickersSybmols] = [];
+            }
           }
         }
-        [...this.arrTickersSybmols] = newArrTickersName;
-      } else {
-        [...this.arrTickersSybmols] = [];
       }
     },
+
     selectSymbolTicker(symbol) {
       this.ticker = symbol;
       this.add();
     },
+
     checkTickers() {
       if (
         this.tickers.length &&
@@ -354,25 +381,39 @@ export default {
         return true;
       }
     },
+
     editInput() {
       this.activeTickersName = false;
     }
   },
   watch: {
+    selectedTicker() {
+      this.graph = [];
+    },
+
+    tickers() {
+      localStorage.setItem("cryptonomikon-list", JSON.stringify(this.tickers));
+    },
+
+    paginatedTickers() {
+      console.log("paginatedTickers");
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page -= 1;
+      }
+      if (!this.paginatedTickers.length) {
+        this.filter = "";
+      }
+    },
+
     filter() {
       this.page = 1;
-
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
-      );
     },
-    page() {
+
+    pageStateOptions(value) {
       window.history.pushState(
         null,
         document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+        `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       );
     }
   }

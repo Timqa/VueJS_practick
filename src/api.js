@@ -8,7 +8,6 @@ const currentPrice = new Map();
 const btcPrice = {};
 const BTC_SYMBOL = "BTC";
 const USD_SYMBOL = "USD";
-const wrongTickers = [];
 
 const socket = new WebSocket(
   `wss://streamer.cryptocompare.com/v2?api_key=${API_KEY}`
@@ -64,7 +63,6 @@ socket.addEventListener("message", e => {
 
   // --- не даем записать тикер BTC/USD в мар
   if (currency !== BTC_SYMBOL) {
-    wrongTickers.push(currency);
     currentPrice.set(currency, newPrice);
   }
 

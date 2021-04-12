@@ -28,7 +28,6 @@ socket.addEventListener("message", e => {
     PARAMETER: param,
     PRICE: newPrice
   } = JSON.parse(e.data);
-  console.log(JSON.parse(e.data));
 
   //--------- если подписываемся на тикер, то сразу подписываемся на BTC/USD, что бы вычеслять цену
   if (tickersHandlers.size && !subscribeToBTCUSD) {

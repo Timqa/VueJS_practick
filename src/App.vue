@@ -119,9 +119,9 @@
             @click="selectTicker(tick)"
             :class="{
               'border-4': selectedTicker === tick,
-              'bg-white': tick.price !== '-'
+              'bg-red-100': tick.price === '-'
             }"
-            class="bg-red-100 overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
@@ -158,12 +158,16 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div
+          class="flex items-end border-gray-600 border-b border-l h-64"
+          ref="graph"
+        >
           <div
             v-for="(bar, idx) in normalizedGraph"
             :key="idx"
-            :style="{ height: `${bar}%` }"
-            class="bg-purple-800 border w-10"
+            :style="{ height: `${bar}%`, width: `${widthBarGraph}px` }"
+            class="bg-purple-800 border"
+            ref="barWidth"
           ></div>
         </div>
         <button type="button" class="absolute top-0 right-0">
@@ -212,7 +216,9 @@ export default {
       selectedTicker: null,
       symbolsTickers: [],
       arrTickersSybmols: [],
-      graph: []
+      graph: [],
+      maxGraphElements: 1,
+      widthBarGraph: 38
     };
   },
 
@@ -248,6 +254,14 @@ export default {
             ([value]) => value
           ))
       );
+  },
+
+  mounted() {
+    window.addEventListener("resize", this.calculateMaxGraphElements);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener("resize", this.calculateMaxGraphElements);
   },
 
   computed: {
@@ -293,10 +307,29 @@ export default {
   },
 
   methods: {
+    calculateMaxGraphElements() {
+      if (!this.$refs.graph) {
+        return;
+      }
+      this.maxGraphElements = this.$refs.graph.clientWidth / this.widthBarGraph;
+
+      if (this.graph.length > this.maxGraphElements) {
+        this.graph = this.graph.slice(0, this.graph.length - 1);
+      }
+    },
+
     updateTicker(tickerName, price) {
       this.tickers
         .filter(t => t.name === tickerName)
         .forEach(t => {
+          if (t === this.selectedTicker) {
+            this.graph.push(price);
+
+            if (this.graph.length > this.maxGraphElements) {
+              console.log(2);
+              this.graph.shift();
+            }
+          }
           t.price = price;
         });
     },
